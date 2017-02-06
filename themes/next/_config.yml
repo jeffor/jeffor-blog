@@ -477,4 +477,10 @@ images: images
 # Theme version
 version: 5.1.0
 
+# 百度统计
 baidu_analytics: c92debb9eea057198f6ebfc80da6a25a
+
+# 打赏配置
+reward_comment: 你的支持是我不懈创作的最好鼓励！
+wechatpay: /images/payment/WechatPay.png
+alipay: /images/payment/AliPay.jpeg
