@@ -386,6 +386,186 @@ author: jeffor
   > 看来 `Business business = lazyLoadString("hello world");` 并没有正真创建`Business`实例, 而是在代理对象第一次进行方法调用时才正真触发实例创建操作。可想而知 **LazyLoader** 的功能了吧 ^ ^。
 
 
+### Dispatcher 代理逻辑调用器
+
+- **Dispatcher** 接口用来定义一个可分发对象，它需要使用 **CallbackFilter** 实现对象路由策略:
+	
+	```
+	import net.sf.cglib.proxy.Callback;
+	import net.sf.cglib.proxy.Dispatcher;
+	import net.sf.cglib.proxy.Enhancer;
+	
+	/**
+	 * Dispatcher 代理逻辑
+	 */
+	public class CglibDispatcher {
+	
+	
+	    public static void main(String... args) {
+	        Object[] business = new Object[]{(Eat) () -> "eat", (Drink) () -> "drink"};
+	        Object person = createPerson(business);
+	        System.out.println(((Eat) person).eat());
+	        System.out.println(((Drink) person).drink());
+	
+	        business[0] = (Eat) () -> "Eat";
+	        System.out.println(((Eat) person).eat());
+	
+	    }
+	
+	
+	    /**
+	     * 创建代理对象
+	     */
+	    public static Object createPerson(Object[] business) {
+	
+	        Enhancer enhancer = new Enhancer();
+	        enhancer.setInterfaces(new Class[]{Eat.class, Drink.class});    // 设置代理接口
+	        enhancer.setCallbackFilter(
+	                method -> method.getName().equals("eat") ? 0 : 1);      // 设置分发路由规则
+	        enhancer.setCallbacks(new Callback[]{
+	                (Dispatcher) () -> {
+	                    System.out.println("set callback0");
+	                    return business[0];
+	                },
+	                (Dispatcher) () -> {
+	                    System.out.println("set callback1");
+	                    return business[1];
+	                }});     // 设置调度对象
+	        return enhancer.create();
+	    }
+	
+	
+	    /**
+	     * 业务类定义
+	     *
+	     * 这里定义了两个业务类型
+	     */
+	
+	    interface Eat {
+	        String eat();
+	    }
+	
+	
+	    interface Drink {
+	        String drink();
+	    }
+	}
+	```
+- 让我们先看一下输出:
+	
+   ```
+   set callback0
+   eat
+   set callback1
+   drink
+   set callback0
+   Eat
+   ```
+
+   根据我们在 `enhancer.setCallbackFilter` 里面定义的代理路由逻辑，被调的方法名称决定了路由对象。根据输出结果不难推断：当代理对象方法调用时，对应目标对象的装载方法也将被执行。因此可以保证目标对象更新时，装载对象无需更新。
+	
+
+
+### ProxyRefDispatcher 代理逻辑调用器
+
+- **ProxyRefDispatcher** 也是一个代理分发器，其实现逻辑和特性基本与 **Dispatcher** 一致。唯一的区别在于其装载方法中传递了一个当前代理对象的引用 `proxy`:
+
+	```
+	package net.sf.cglib.proxy;
+	
+	/**
+	 * Dispatching {@link Enhancer} callback. This is the same as the
+	 * {@link Dispatcher} except for the addition of an argument
+	 * which references the proxy object.
+	 */
+	public interface ProxyRefDispatcher extends Callback {
+	    /**
+	     * Return the object which the original method invocation should
+	     * be dispatched. This method is called for <b>every</b> method invocation.
+	     * @param proxy a reference to the proxy (generated) object
+	     * @return an object that can invoke the method
+	     */
+	    Object loadObject(Object proxy) throws Exception;
+	}
+	```
+- 构建和 **Dispatcher** 相似的样例代码如下:
+
+	```
+	import net.sf.cglib.proxy.Callback;
+	import net.sf.cglib.proxy.Enhancer;
+	import net.sf.cglib.proxy.ProxyRefDispatcher;
+	
+	/**
+	 * Dispatcher 代理逻辑
+	 */
+	public class CglibDispatcher {
+	
+	
+	    public static void main(String... args) {
+	        Object[] business = new Object[]{(Eat) () -> "eat", (Drink) () -> "drink"};
+	        Object person = createPerson(business);
+	        System.out.println(((Eat) person).eat());
+	        System.out.println(((Drink) person).drink());
+	
+	        business[0] = (Eat) () -> "Eat";
+	        System.out.println(((Eat) person).eat());
+	
+	    }
+	
+	
+	    /**
+	     * 创建代理对象
+	     */
+	    public static Object createPerson(Object[] business) {
+	
+	        Enhancer enhancer = new Enhancer();
+	        enhancer.setInterfaces(new Class[]{Eat.class, Drink.class});    // 设置代理接口
+	        enhancer.setCallbackFilter(
+	                method -> method.getName().equals("eat") ? 0 : 1);      // 设置分发路由规则
+	        enhancer.setCallbacks(new Callback[]{
+	                (ProxyRefDispatcher) (p) -> {
+	                    System.out.println("set callback0");
+	                    return business[0];
+	                },
+	                (ProxyRefDispatcher) (p) -> {
+	                    System.out.println("set callback1");
+	                    return business[1];
+	                }});     // 设置调度对象
+	        return enhancer.create();
+	    }
+	
+	
+	    /**
+	     * 业务类定义
+	     *
+	     * 这里定义了两个业务类型
+	     */
+	
+	    interface Eat {
+	        String eat();
+	    }
+	
+	
+	    interface Drink {
+	        String drink();
+	    }
+	}
+	```
+
+- 其运行结果与 **Dispatcher** 样例一致:
+	
+	```
+	set callback0
+	eat
+	set callback1
+	drink
+	set callback0
+	Eat
+	```
+
+   由此可见它们的区别仅在于目标对象装载上，**ProxyRefDispatcher** 可以在装载时更方便地使用代理对象的信息。
+
+
 > 码字太累，还剩几个调用器后续再补充完整(欢~迎~打~赏~) ^ ^
 
 ## 三、CGLIB 动态代理特点归纳和总结
