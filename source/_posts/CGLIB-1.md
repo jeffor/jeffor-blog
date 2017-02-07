@@ -565,8 +565,93 @@ author: jeffor
 
    由此可见它们的区别仅在于目标对象装载上，**ProxyRefDispatcher** 可以在装载时更方便地使用代理对象的信息。
 
+### NoOp 代理逻辑调用器
 
-> 码字太累，还剩几个调用器后续再补充完整(欢~迎~打~赏~) ^ ^
+- **NoOp** 代理逻辑调用器正如其名字所定义，若一个方法使用该调用器，代理对象将直接调用被代理对象的方法，不进行任何逻辑切入。可能有人会疑惑什么场景会使用一个不切入代理逻辑的代理调用？确实如此，**NoOp** 一般不会单独使用，它往往配合其他调用器实现复杂的方法代理功能，请见如下样例:
+	
+	```
+	import net.sf.cglib.proxy.CallbackHelper;
+	import net.sf.cglib.proxy.Enhancer;
+	import net.sf.cglib.proxy.MethodInterceptor;
+	import net.sf.cglib.proxy.NoOp;
+	
+	import java.lang.reflect.Method;
+	
+	/**
+	 * NoOp 代理逻辑调用器
+	 */
+	public class CglibNoOp {
+	
+	    public static void main(String... args) {
+	        Business business = createProxy(Business.class);
+	        System.out.println("开始调用非业务方法");
+	        business.sayHello();
+	        System.out.println("开始调用业务方法");
+	        business.doBusiness();
+	    }
+	
+	    public static Business createProxy(Class proxyCls) {
+	
+	        CallbackHelper callbackHelper = new CallbackHelper(proxyCls, new Class[0]) {
+	            @Override
+	            protected Object getCallback(Method method) {
+	                /**
+	                 * 根据方法名称判断业务方法
+	                 *
+	                 * 1. 对于业务方法切入代理逻辑
+	                 *
+	                 * 2. 对于其他方法, 不进行代理操作*/
+	                if (method.getName().contains("Business")) {
+	                    return (MethodInterceptor) (obj, method1, args, proxy) -> {
+	                        System.out.println("do proxy logical");
+	                        return proxy.invokeSuper(obj, args);
+	                    };
+	                } else {
+	                    return NoOp.INSTANCE;
+	                }
+	            }
+	        };
+	
+	        Enhancer enhancer = new Enhancer();
+	        enhancer.setSuperclass(proxyCls);
+	        enhancer.setCallbackFilter(callbackHelper);
+	        enhancer.setCallbacks(callbackHelper.getCallbacks());
+	        return (Business) enhancer.create();
+	    }
+	
+	
+	    private static class Business {
+	
+	        public Business() {
+	        }
+	
+	        public void sayHello() {
+	            System.out.println("hello world");
+	        }
+	
+	        public void doBusiness() {
+	            System.out.println("do business");
+	        }
+	    }
+	}
+	```
+
+- 该样例输出结果如下:
+
+	```
+	开始调用非业务方法
+	hello world
+	开始调用业务方法
+	do proxy logical
+	do business
+	```
+
+  哈哈~ 看明白了吗？这里新引入了一个 `CallBackHelper` 类型对象，它的 `getCallback()` 方法将根据被调方法信息选择合适的 `CallBack 实例`。是的，对于一个类来说，并不是所有的方法都需要存在代理逻辑，如`Object.clone()`方法，此时使用 `NoOp.INSTANCE` 对象就再合适不过了 ^ ^。
+ 
+ 
+### 友情提示
+
+ **样例中大量使用了非静态匿名类的声明方式，该方式会在内部类对象中隐式生成一个外部类对象的引用。而内部类对象往往难以直接引用，当内部类对象不能释放时，外部类对象也将无法释放，容易引发 `java内存写漏`。样例中的使用方式完全在于缩减代码量考虑，生产环境中可使用`静态内部类`代替。**
 
 ## 三、CGLIB 动态代理特点归纳和总结
 
@@ -579,3 +664,5 @@ author: jeffor
  5. 个人认为 CGLIB 代理实现上更直观简洁;
 
 > 不难发现 **CGLIB** 的 **代理逻辑** 和 **代理装配逻辑** 也相互隔离，而装配逻辑可能在运行时才确定。因此 **CGLIB** 和 **JDK原生动态代理** 一样也是运行时实现代理生成的。但相较而言，使用 **CGLIB** 实现动态代理会更方便，更安全。
+> 
+> 想要更深度了解 `CGLIB` 的小伙伴可以阅读[官方tutorial](https://github.com/cglib/cglib/wiki/Tutorial),必须让你受益无穷。 ^ ^
