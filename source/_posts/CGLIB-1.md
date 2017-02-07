@@ -25,9 +25,9 @@ author: jeffor
 ## 一、CGLIB 实现动态代理的一般步骤 
 
   在 **CGLIB** 中存在一个关键类 **Enhancer**。众所周知，代理要对原有对象对外暴露功能进行托管和增强，对于一个业务对象，狭义上的对外契约可以认为是业务接口，但是广义而言，任意对象的 `public` 方法都可以认为是暴露于外部的契约。因此在 **CGLIB** 中，其代理类的创建可以依赖任意类(区别于  `JDK 原生动态代理` 的面向接口代理)。
-
+  
   CGLIB 动态代理实现的简单步骤如下:
- 
+  
   ```
   Enhancer enhancer = new Enhancer();                     // 创建增强器
   enhancer.setSuperclass(businessObject.getClass());      // 设置被代理类
@@ -36,15 +36,15 @@ author: jeffor
             
   businessProxy.doBusiness();                             // 业务调用
   ```
- 
+  
   上面步骤中 `callBackLogic` 是代理逻辑调用器对象，定义了具体代理切入逻辑、方法调用方式等，为 **CGLIB** 中 `Callback` 接口的实例。**CGLIB** 中有许多不同的 **CallBack** 子接口，对应了各种不同功能的代理逻辑。
- 
+  
   - **CallBack** 子接口展示:
- 
+  
   ![**CallBack** 子接口](/images/callback-subinterface.png)
 
 ---
- 
+  
 ## 二、CGLIB 动态代理实现样例
 
 老话讲,唯有实战才是磨炼技能的唯一标准，接下来我们根据一些简单样例分析 **CGLIB** 的特性:
@@ -309,6 +309,82 @@ author: jeffor
 	未知调用
 	do after business
   ```
+
+
+### LazyLoader 代理逻辑调用器
+
+- 延迟加载将定义一个代理创建过程，返回被代理类型的一个对象实例。延迟加载样例代码如下:
+
+	```
+	import net.sf.cglib.proxy.Enhancer;
+	import net.sf.cglib.proxy.LazyLoader;
+	
+	/**
+	 * LazyLoader 代理逻辑调用器
+	 */
+	public class CglibLazyLoader {
+	
+	
+	    public static void main(String... args) {
+	        Business business = lazyLoadString("hello world");
+	        System.out.println("首次调用对象");
+	        System.out.println(business.getProperty());
+	        System.out.println("再次调用对象");
+	        System.out.println(business.getProperty());
+	    }
+	
+	
+	    /**
+	     * 延迟加载方法
+	     */
+	    public static Business lazyLoadString(String msg) {
+	
+	        Enhancer enhancer = new Enhancer();
+	        enhancer.setSuperclass(Business.class);
+	        enhancer.setCallback(new LazyLoader() {
+	            @Override
+	            public Object loadObject() throws Exception {
+	                System.out.println("延迟加载调用");
+	                return new Business(msg);
+	            }
+	        });
+	        Business business = (Business) enhancer.create();
+	        return business;
+	    }
+	
+	
+	    public static class Business {
+	        private String property;
+	
+	        public Business() {
+	        }
+	
+	        public Business(String property) {
+	            this.property = property;
+	        }
+	
+	        public String getProperty() {
+	            return property;
+	        }
+	
+	        public void setProperty(String property) {
+	            this.property = property;
+	        }
+	    }
+	}
+	```
+   代理逻辑方法的签名是不是很熟悉？没错，这个 **public Object loadObject() throws Exception** 和 **FixedValue** 中的方法签名是一样的，但是他们的功能却截然不同。在 **LazyLoader** 中，他负责创建并返回一个业务对象的实例。该样例的运行结果如下:
+  
+  ```
+   首次调用对象
+   延迟加载调用
+   hello world
+   再次调用对象
+   hello world
+  ```
+ 
+  > 看来 `Business business = lazyLoadString("hello world");` 并没有正真创建`Business`实例, 而是在代理对象第一次进行方法调用时才正真触发实例创建操作。可想而知 **LazyLoader** 的功能了吧 ^ ^。
+
 
 > 码字太累，还剩几个调用器后续再补充完整(欢~迎~打~赏~) ^ ^
 
