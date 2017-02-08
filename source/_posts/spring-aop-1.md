@@ -25,15 +25,15 @@ author: jeffor
 
 ## 一. 基本概念
 
-**让我们先了解一下spring AOP 的一些基础概念（这些关键字在说明的时候并不大直观，目前不理解没关系，在后面的样例中我们将逐一详细了解）:**
+**让我们先了解一下spring AOP 的一些基础概念:**
 
-1. aspect(切面): 跨越多各类的共同逻辑，即从多个类中抽出的相同执行模块，如事务管理模块。此处 `aspcet` 只是概念性关键字， 下面介绍的其他关键字都属于切面的范畴。
+1. aspect(切面): 跨越多个类的共同逻辑，即从多个类中抽出的相同执行模块，如事务管理模块。此处 `aspcet` 只是概念性关键字， 下面介绍的其他关键字都属于切面的范畴。
 2. join point(连接点): 程序中允许切面执行的时机，如方法执行时，异常处理时。需要注意的是`spring只支持方法连接点`。
-3. advice(通知): advice 是切面在切点处的执行逻辑。切面按照其执行方式可以分成`before advice`, `after advice`, `after throwing advice`, `after return advice`, `around advice`五种。
-4. pointcut(切点): pointcut 用来定义切面的连接点匹配规则。`advice` 会根据 `pointcut` 定义的规则匹配对应的 `joint point`, 并最终执行 `advice` 定义的切面逻辑。
-5. introduction(引入): 这应该可以理解成切面编程中一个特殊的功能: 向一个类中引入外部接口和属性，可以让一个类扩展对外暴露的功能。
-6. target object(目标对象): 被切面切入逻辑的对象。
-7. AOP proxy(切面代理对象): 框架为实现切面生成的动态代理对象。spring动态代理对象中可以分为`JDK dynamic proxy` 和 `CGLIB dynamic proxy`。
+3. advice(通知): advice 是切面在切点处的执行逻辑，其按照其执行方式可以分成`before advice`, `after advice`, `after throwing advice`, `after returning advice`, `around advice`五种。
+4. pointcut(切点): pointcut 定义了切面与连接点的匹配规则。`advice` 会根据 `pointcut` 定义的规则去匹配相应的 `joint point`, 并最终执行 `advice` 定义的切面逻辑。
+5. introduction(引入): 这应该可以理解成切面编程中一个特殊的功能: 向一个类中引入外部接口和属性，简单地说就是扩展一个类对外暴露的接口。
+6. target object(目标对象): 被切面切入代理逻辑的业务对象。
+7. AOP proxy(切面代理对象): 框架为实现切面生成的动态代理对象。spring 动态代理对象可以分为`JDK dynamic proxy` 和 `CGLIB dynamic proxy`。
 8. waving(织入): 指实现切面和目标类进行关联的行为过程，通常 `编译,加载,运行` 环节都可进行。`spring AOP 框架` 和 其他 `纯 java aop 框架` 一样只在运行时进行织入。
 
 > 这些概念目前看来可能还不大直观，但是不用着急，在后面的样例中我们将逐一详细了解。到时候再回顾来看就肯定清晰了。
@@ -53,7 +53,7 @@ author: jeffor
 
 ## 三. spring AOP 详解
 
-**这里因为篇幅原因我只描述 spring 基于注解的 AOP 实现，spring 还支持基于 schema 配置的 AOP 实现，它们除了表现形式不同之外没什么其他区别。相比而言 注解形式 更简约便捷。对 schema 配置形式感兴趣的小伙伴可以自己了解。**
+**这里因为篇幅原因我只描述 spring 基于注解的 AOP 实现，spring 还支持基于 `xml schema` 配置的 AOP 实现，它们除了表现形式不同之外没什么其他区别。相比而言 注解形式 更清晰便捷。对 `xml schema` 配置形式感兴趣的小伙伴可以自己了解。**
 
 ### I. 使用 @AspectJ 注解声明切面
 
@@ -80,7 +80,7 @@ author: jeffor
 
 2. 启用切面注解配置功能:
 
- spring 同时支持 XML 切面配置 和 注解形式切面配置，若想启用注解方式，则需要在配置类(@Configuration 注释的类)上标注启用标签`@EnableAspectJAutoProxy`:
+ spring 同时支持 `XML schema 切面配置` 和 `注解形式 切面配置`，若想启用注解方式，则需要在配置类(@Configuration 注释的类)上标注启用标签`@EnableAspectJAutoProxy`:
 
  ```
  @Configuration
@@ -89,7 +89,7 @@ author: jeffor
  public class AppConfig { }
  ```
 
- > 注意 `@EnableAspectJAutoProxy` 可以指定 `proxyTargetClass` 属性，它用来控制是否只用 CGLIB 动态代理(默认为false, 即由spring框架自动选择)。
+ > 注意 `@EnableAspectJAutoProxy` 可以指定 `proxyTargetClass` 属性，它用来控制是否只用 CGLIB 动态代理(默认为false, 即由spring框架自动选择代理逻辑)。
 
 3. 声明切面:
 
@@ -126,20 +126,7 @@ author: jeffor
 
  spring 只是支持了部分的 AspectJ pointcut 表达式规则，接下来我们逐一讲解其所支持的表达式规则。
 
-#### execution 表达式
-
- 由于spring只支持方法级别切点定义，因此切点声明本质上就是定义可执行方法的描述。
-spring只支持方法级别的切点。因此切点声明需要包含两个部分: 1. 函数签名; 2. 返回值。
-切点声明使用 `@Pointcut` 注解实现，如下:
-
-```
-￼@Pointcut("execution(* transfer(..))")// the pointcut expression
- private void anyOldTransfer() {}// the pointcut signature
-```
-
-> @Ponitcut 中的表达式是普通的 `AspectJ 5` 的切点表达式。通过 [AspectJ Programming Guide](http://www.eclipse.org/aspectj/doc/released/progguide/index.html)了解详细内容.
-
-- execution 切点
+####  execution 切点
 
  1. `execution` 切点是最常用的切点定义方式，其定义模式如下:
 
@@ -147,18 +134,18 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
    execution(modifier-pattern? ret-type-pattern declaring-type-pattern?name-pattern(param-patterm) throw-pattern?)
   ```
 
- |pattern|含义|是否必须定义|
- | :--- | :--- | :--- |
- |modifier-pattern|修饰符|否|
- |ret-type-pattern|返回值类型定义|是|
- |declaring-type-pattern|方法类定义|否|
- |name-pattern|方法名称定义|是|
- |param-patterm|参数列表定义|是|
- |throw-pattern|异常类型定义|否|
+|pattern|含义|是否必须定义|
+| :--- | :--- | :--- |
+|modifier-pattern|修饰符|否|
+|ret-type-pattern|返回值类型定义|是|
+|declaring-type-pattern|方法类定义|否|
+|name-pattern|方法名称定义|是|
+|param-patterm|参数列表定义|是|
+|throw-pattern|异常类型定义|否|
 
- > pattern 可以使用通配符定义: `*` 用来匹配所有模式，`.`用来表示类路径的分量符,`..`表示一个包及其子包下的任意类, `(..)`可以表示任意参数列表(表示包含零个或多个任意类型参数)
+> pattern 可以使用通配符定义: `*` 用来匹配所有模式，`.`用来表示类路径的分量符,`..`表示一个包及其子包下的任意类, `(..)`可以表示任意参数列表(表示包含零个或多个任意类型参数)
 
- 2. `execution` pointcut 定义样例:
+ 2. `execution pointcut` 定义样例:
 
  ```
     /**
@@ -225,7 +212,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
     }
  ```
 
- > args 切点和 execution `execution(* *(*, String)` 切点还是不太相同的，execution 限定了目标方法的定义方式，而args则限定了目标方法在运行时是否传入 `(*, String)` 参数列表
+ > args 切点和 execution `execution(* *(*, String)` 切点还是不太相同的，execution 限定了目标方法的定义方式，而args则限定了目标方法在运行时是否传入 `(*, String)` 参数列表,是一种运行时限定。
 
 #### this 切点:
 
@@ -254,7 +241,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
  ```
 
  > 注意 `this 切入` 和 `target 切入` 类型的区别，this是对代理对象的限定规则，target是对目标对象的限定规则。
- > 需要了解的是 `JDK 动态代理` 在实现时，proxy对象实现了代理接口，而 `CGLIB 动态代理` 却并不一定。
+ > 需要了解的是 `JDK 动态代理` 在实现时，proxy对象实现了代理接口，而 `CGLIB 动态代理` 却并不一定。同时spring AOP 的 Introduction 功能将使代理对象继承新的接口，但目标对象（业务对象）却并未继承任何接口。
 
 #### bean 切入:
 
@@ -271,7 +258,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
 
 #### @target 切入:
 
-- 任意目标对象标注了特定标签方法:
+- 匹配任意目标对象标注了特定标签:
 
  ```
     /**
@@ -284,7 +271,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
 
 #### @within 切入:
 
-- 任意拥有特定注解的类型的方法:
+- 匹配任意拥有特定注解的类型:
 
  ```
 	/**
@@ -297,7 +284,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
 
 #### @annotation 切入:
 
-- 任意标注了特定注解的方法:
+- 匹配任意标注了特定注解的方法:
 
  ```
 	/**
@@ -310,7 +297,7 @@ spring只支持方法级别的切点。因此切点声明需要包含两个部�
 
 #### @args 切入:
 
-- 任意参数列表添加了特定标注的方法:
+- 匹配任意参数列表添加了特定注解注释的方法:
 
  ```
 	/**
