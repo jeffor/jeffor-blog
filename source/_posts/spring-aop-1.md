@@ -602,7 +602,7 @@ author: jeffor
  1. 将两个 advice 合并为一个 advice，那么执行顺序就可以通过代码控制了
  2. 将两个 advice 分别抽离到各自的 aspect 内，然后为 aspect 指定执行顺序
 
-#### introduction 引入功能
+#### introduction 引入功能:
 
  `Introduction 引入功能` 将使被代理的对象拥有额外接口，使其无需继承便拥有特定接口的特定实现。Introduction 使用 `@DeclareParents`注解定义引入的接口和实现。下面贴出样例来分析引用过程:
 
@@ -619,6 +619,29 @@ author: jeffor
  ```
 
  > 上面样例中 `UsageTracked` 是一个接口, `DefaultUsageTracked` 是该接口的一个实现类。上面定义的`@DeclareParents(value="com.xzy.myapp.service.*+", defaultImpl=DefaultUsageTracked.class)`声明了`com.xzy.myapp.service`包下的所有类都将引入`UsageTracked`接口的功能，默认执行`DefaultUsageTracked.class`类的实现逻辑。
+
+#### spring AOP 切面装载模型:
+
+  - 默认情况下 spring 会为每个 `切面类` 在应用上下文中创建单个实例，在 `AspectJ` 中这种方式称为 `singleton install model（单例装载模型）`。其实spring还支持`AspectJ`中的 `perthis` 和 `pertarget` 模型。下面来介绍一下spring支持的三种实例装载模型:
+
+    1. singleton: 每个切面类在应用上下文中只会生成一个 `切面实例`,该实例会被全局复用;
+    2. perthis: 对于每个代理对象，生成各自的 `切面实例`，生命周期跟随代理对象;
+    3. pertarget: 对于每个目标对象, 生成各自的 `切面实例`，生命周期跟随目标对象;
+
+    > singleton 模型在大多数场景下是非常高效的，但是当一个 `AspectJ类` 定义了状态信息，我们就要考虑使用 `perthis` 或 `pertarget` 模型了。
+
+  - 显式声明装载模型:
+
+  ```
+  @Aspect("perthis(com.xyz.myapp.SystemArchitecture.businessService())")
+  public class MyAspect { private int someState;
+      @Before(com.xyz.myapp.SystemArchitecture.businessService())
+  public void recordServiceUsage() { // ...
+  } }
+  ```
+
+  如上所示，`perthis` 声明语法为 `perthis(Pointcut)`, 将其显式定义为 @AspectJ 的值之后便启用 perthis 装载模式了。`pertarget` 的声明和 `perthis` 类似。
+  另外提一点，目前只有注解形式的 spring AOP 配置才能支持装载模型的灵活配置。
 
 
 ## 总结
